@@ -1,0 +1,100 @@
+#!/bin/bash
+
+VERSION="2.0"
+
+banner() {
+    echo "╔════════════════════════════════╗"
+    echo "║        ROCK GMR v$VERSION       ║"
+    echo "║   Network Recon Tool           ║"
+    echo "╚════════════════════════════════╝"
+    echo
+}
+
+usage() {
+    echo "Rock GMR - Network Reconnaissance Tool"
+    echo
+    echo "Usage:"
+    echo "  rockgmr <target>"
+    echo "  rockgmr <target> --ports 1-100"
+    echo "  rockgmr --help"
+    echo "  rockgmr --version"
+    echo
+}
+
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    usage
+    exit 0
+fi
+
+if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+    echo "Rock GMR v$VERSION"
+    exit 0
+fi
+
+if [ -z "$1" ]; then
+    banner
+    usage
+    exit 1
+fi
+
+TARGET="$1"
+START_PORT=1
+END_PORT=1024
+
+if [ "$2" = "--ports" ]; then
+    RANGE="$3"
+
+    if [[ "$RANGE" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+        START_PORT="${BASH_REMATCH[1]}"
+        END_PORT="${BASH_REMATCH[2]}"
+    else
+        echo "[!] Invalid port range."
+        echo "    Example: --ports 1-100"
+        exit 1
+    fi
+fi
+
+banner
+
+echo "[+] Target : $TARGET"
+echo "[+] Ports  : $START_PORT-$END_PORT"
+echo
+
+if ping -c 1 -W 2 "$TARGET" >/dev/null 2>&1; then
+    echo "[+] Host status : Reachable"
+else
+    echo "[!] Host did not respond to ping."
+    echo "[!] Continuing with TCP checks..."
+fi
+
+echo
+echo "[+] Scanning..."
+echo
+
+REPORT="rockgmr_${TARGET//[^a-zA-Z0-9_.-]/_}.txt"
+
+{
+    echo "Rock GMR v$VERSION"
+    echo "Target: $TARGET"
+    echo "Ports: $START_PORT-$END_PORT"
+    echo
+} > "$REPORT"
+
+printf "%-8s %-10s\n" "PORT" "STATE"
+echo "--------------------"
+
+for ((PORT=START_PORT; PORT<=END_PORT; PORT++)); do
+
+    timeout 1 bash -c "</dev/tcp/$TARGET/$PORT" \
+        >/dev/null 2>&1
+
+    if [ $? -eq 0 ]; then
+        printf "%-8s %-10s\n" "$PORT" "OPEN"
+        echo "Port $PORT : OPEN" >> "$REPORT"
+    fi
+
+done
+
+echo
+echo "[+] Scan completed."
+echo "[+] Report saved: $REPORT"
